@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import "./App.css";
 
 const BACKEND_URL = "https://stress-prediction-ml-app.onrender.com";
 
-/* Map stress level (0–4) to gauge angle */
+// Gauge mapping
 const stressToAngle = (level) => {
   const map = {
     0: -90,
@@ -15,7 +15,6 @@ const stressToAngle = (level) => {
   return map[level] ?? -90;
 };
 
-/* Labels for stress levels */
 const stressLabels = {
   0: "Very Low Stress",
   1: "Low Stress",
@@ -27,16 +26,7 @@ const stressLabels = {
 function App() {
   const [features, setFeatures] = useState(Array(9).fill(0));
   const [stressCode, setStressCode] = useState(2);
-  const [connected, setConnected] = useState(false);
-
-  /* Initial backend health check (may fail due to cold start — that's OK) */
-  useEffect(() => {
-    fetch(`${BACKEND_URL}/`)
-      .then((res) => {
-        if (res.ok) setConnected(true);
-      })
-      .catch(() => setConnected(false));
-  }, []);
+  const [connected, setConnected] = useState(null); // null = unknown
 
   const handleChange = (index, value) => {
     const updated = [...features];
@@ -44,7 +34,6 @@ function App() {
     setFeatures(updated);
   };
 
-  /* MAIN FIX IS HERE */
   const predictStress = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/predict`, {
@@ -56,12 +45,11 @@ function App() {
       if (!res.ok) throw new Error("Backend error");
 
       const data = await res.json();
-
       setStressCode(data.stress_code);
-      setConnected(true); // ✅ backend confirmed alive
+      setConnected(true); // ✅ backend confirmed working
     } catch (err) {
-      console.error("Backend error:", err);
-      setConnected(false);
+      console.error(err);
+      setConnected(false); // ❌ backend failed
     }
   };
 
@@ -69,11 +57,23 @@ function App() {
     <div className="app">
       <h1>Stress Level Analysis</h1>
 
-      {/* Backend status indicator */}
+      {/* Backend status */}
       <div className="backend-status">
-        <div className={`backend-dot ${connected ? "online" : "offline"}`} />
+        <div
+          className={`backend-dot ${
+            connected === true
+              ? "online"
+              : connected === false
+              ? "offline"
+              : "unknown"
+          }`}
+        />
         <span>
-          {connected ? "Backend Connected" : "Backend Not Reachable"}
+          {connected === null
+            ? "Backend status unknown"
+            : connected
+            ? "Backend Connected"
+            : "Backend Not Reachable"}
         </span>
       </div>
 
@@ -112,9 +112,7 @@ function App() {
             />
           </div>
 
-          <h3 className="stress-label">
-            {stressLabels[stressCode]}
-          </h3>
+          <h3 className="stress-label">{stressLabels[stressCode]}</h3>
           <p className="sub">Predicted Stress Level</p>
         </div>
       </div>
