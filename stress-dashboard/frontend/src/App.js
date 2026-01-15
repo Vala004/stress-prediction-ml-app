@@ -1,61 +1,56 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
 
-const stressMap = {
-  0: { angle: -90, label: "Very Low Stress", class: "very-low" },
-  1: { angle: -45, label: "Low Stress", class: "low" },
-  2: { angle: 0, label: "Moderate Stress", class: "medium" },
-  3: { angle: 45, label: "High Stress", class: "high" },
-  4: { angle: 90, label: "Very High Stress", class: "critical" }
+const BACKEND_URL = "https://stress-prediction-ml-app.onrender.com";
+
+const stressToAngle = (level) => {
+  const map = {
+    0: -90,
+    1: -45,
+    2: 0,
+    3: 45,
+    4: 90,
+  };
+  return map[level] ?? -90;
+};
+
+const stressLabels = {
+  0: "Very Low Stress",
+  1: "Low Stress",
+  2: "Moderate Stress",
+  3: "High Stress",
+  4: "Very High Stress",
 };
 
 function App() {
   const [features, setFeatures] = useState(Array(9).fill(0));
-  const [stressAngle, setStressAngle] = useState(-90);
-  const [stressLabel, setStressLabel] = useState("Awaiting Prediction");
-  const [stressClass, setStressClass] = useState("");
-  const [backendStatus, setBackendStatus] = useState("Checking backend...");
+  const [stressCode, setStressCode] = useState(2);
+  const [connected, setConnected] = useState(false);
 
-  // -----------------------
-  // Check backend health
-  // -----------------------
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/")
-      .then(() => setBackendStatus("Backend Connected"))
-      .catch(() => setBackendStatus("Backend Not Reachable"));
+    fetch(`${BACKEND_URL}/`)
+      .then((res) => res.ok && setConnected(true))
+      .catch(() => setConnected(false));
   }, []);
 
-  // -----------------------
-  // Handle input
-  // -----------------------
-  const updateFeature = (index, value) => {
+  const handleChange = (index, value) => {
     const updated = [...features];
     updated[index] = Number(value);
     setFeatures(updated);
   };
 
-  // -----------------------
-  // Predict
-  // -----------------------
-  const handlePredict = async () => {
+  const predictStress = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/predict", {
+      const res = await fetch(`${BACKEND_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ features })
+        body: JSON.stringify({ features }),
       });
 
       const data = await res.json();
-
-      if (data.stress_code !== undefined) {
-        const result = stressMap[data.stress_code];
-        setStressAngle(result.angle);
-        setStressLabel(result.label);
-        setStressClass(result.class);
-      }
-    } catch {
-      setStressLabel("Backend Not Reachable");
-      setStressClass("critical");
+      setStressCode(data.stress_code);
+    } catch (err) {
+      console.error("Backend error");
     }
   };
 
@@ -63,7 +58,12 @@ function App() {
     <div className="app">
       <h1>Stress Level Analysis</h1>
 
-      <div className="container">
+      <div className="backend-status">
+        <div className={`backend-dot ${connected ? "online" : "offline"}`} />
+        <span>{connected ? "Backend Connected" : "Backend Not Reachable"}</span>
+      </div>
+
+      <div className="layout">
         {/* LEFT PANEL */}
         <div className="card">
           <h2>Input Features</h2>
@@ -74,30 +74,32 @@ function App() {
                 key={i}
                 type="number"
                 value={val}
-                onChange={(e) => updateFeature(i, e.target.value)}
+                onChange={(e) => handleChange(i, e.target.value)}
               />
             ))}
           </div>
 
-          <button onClick={handlePredict}>Predict Stress Level</button>
+          <button className="predict-btn" onClick={predictStress}>
+            Predict Stress Level
+          </button>
         </div>
 
         {/* RIGHT PANEL */}
         <div className="card center">
           <h2>Stress Meter</h2>
 
-          <div className="gauge">
+          <div className="gauge-container">
+            <div className="gauge-bg" />
             <div
-              className="needle"
-              style={{ transform: `rotate(${stressAngle}deg)` }}
+              className="gauge-needle"
+              style={{
+                transform: `rotate(${stressToAngle(stressCode)}deg)`,
+              }}
             />
           </div>
 
-          <div className={`result ${stressClass}`}>
-            {stressLabel}
-          </div>
-
-          <div className="backend-status">{backendStatus}</div>
+          <h3 className="stress-label">{stressLabels[stressCode]}</h3>
+          <p className="sub">Predicted Stress Level</p>
         </div>
       </div>
     </div>
